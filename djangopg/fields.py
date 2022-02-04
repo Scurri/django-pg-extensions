@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from django.db import models
-from django.utils.encoding import smart_unicode
+from django.utils.encoding import smart_text
+import six
 
 
-class ArrayField(models.Field):
+class ArrayField(six.with_metaclass(models.SubfieldBase, models.Field)):
     """Base class for fields of type array."""
-
-    __metaclass__ = models.SubfieldBase
 
     _allowed_operators = [
         'exact', 'isnull', 'array_contains',
@@ -56,7 +55,7 @@ class TextArrayField(ArrayField):
         value = super(TextArrayField, self).to_python(value)
         if value is None:
             return None
-        return map(smart_unicode, value)
+        return list(map(smart_text, value))
 
 
 class IntArrayField(ArrayField):
@@ -73,20 +72,18 @@ class CaseInsensitiveMixin(object):
         return 'citext'
 
     def to_python(self, value):
-        if isinstance(value, unicode) or value is None:
+        if isinstance(value, six.text_type) or value is None:
             return value
         if isinstance(value, str):
             return value.decode('UTF-8')
-        return smart_unicode(value)
+        return smart_text(value)
 
 
-class CaseInsensitiveCharField(CaseInsensitiveMixin, models.CharField):
+class CaseInsensitiveCharField(six.with_metaclass(
+        models.SubfieldBase, CaseInsensitiveMixin, models.CharField)):
     """Case-insensitive CharField."""
 
-    __metaclass__ = models.SubfieldBase
 
-
-class CaseInsensitiveSlugField(CaseInsensitiveMixin, models.SlugField):
+class CaseInsensitiveSlugField(
+        models.SubfieldBase, CaseInsensitiveMixin, models.CharField):
     """Case-insensitive SlugField."""
-
-    __metaclass__ = models.SubfieldBase

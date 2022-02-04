@@ -2,10 +2,14 @@
 
 import re
 import csv
-from cStringIO import StringIO
 from contextlib import closing
 from django.db import connections
 from django.db.models import AutoField
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
 def _convert_to_csv_form(data):
@@ -45,7 +49,7 @@ def _send_csv_to_postgres(csv_text, conn, table_name, columns):
     fd = StringIO(csv_text)
     # Move the fp to the beginning of the string
     fd.seek(0)
-    columns = map(conn.ops.quote_name, columns)
+    columns = list(map(conn.ops.quote_name, columns))
     cursor = conn.cursor()
     sql = "COPY %s(%s) FROM STDIN WITH CSV"
     try:

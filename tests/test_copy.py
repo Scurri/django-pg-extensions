@@ -7,10 +7,14 @@ Tests for the COPY command support.
 from datetime import datetime
 import unittest
 import csv
-from StringIO import StringIO
 from mock import patch
 from djangopg.copy import _convert_to_csv_form, copy_insert
 from tests.data import Poll, Choice
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
 class DataConversionTestCase(unittest.TestCase):

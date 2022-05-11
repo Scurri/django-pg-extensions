@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 
-"""
-Tests for the COPY command support.
-"""
-
-from datetime import datetime
 import unittest
-import csv
-from StringIO import StringIO
-from mock import patch
-from djangopg.copy import _convert_to_csv_form, copy_insert
-from tests.data import Poll, Choice
+from datetime import datetime
+
+import pytest
+import six
+
+from djangopg.copy import (
+    _convert_to_csv_form, copy_insert, copy_insert_raw
+)
+from integration_tests.models import Poll, Choice
 
 
 class DataConversionTestCase(unittest.TestCase):
@@ -42,7 +41,9 @@ class DataConversionTestCase(unittest.TestCase):
     def test_encoding_for_unicode_is_utf8_(self):
         data = u'Δοκιμή'
         res = _convert_to_csv_form(data)
-        expected = data.encode('UTF-8')
+        expected = data
+        if six.PY2:
+            expected = data.encode('UTF-8')
         self.assertEqual(res, expected)
 
     def test_str_is_returned_attached(self):
@@ -53,7 +54,7 @@ class DataConversionTestCase(unittest.TestCase):
         self.assertEqual(res, expected)
 
 
-@patch('djangopg.copy._send_csv_to_postgres')
+@pytest.mark.django_db
 class ColumnsTestCase(unittest.TestCase):
     """Tests for the columns used in copy."""
 
@@ -63,66 +64,59 @@ class ColumnsTestCase(unittest.TestCase):
             Poll(question="Question2", pub_date=datetime.now()),
         ]
 
-    def test_all_non_pk_columns_are_used_if_none_specified(self, pmock):
+    def test_all_non_pk_columns_are_used_if_none_specified(self):
         copy_insert(Poll, self.entries)
-        columns = pmock.call_args[0][3]
-        self.assertEqual(len(columns), 2)
+        qs = Poll.objects.all()
+        values = qs.values_list(flat=False)
+        for no, q, p in values:
+            assert "Question{}".format(no) in q
+            assert isinstance(p, datetime)
+        self.assertEqual(len(values), 2)
 
-    def test_specified_columns_only_are_used(self, pmock):
+    def test_specified_columns_only_are_used(self):
         copy_insert(Poll, self.entries, columns=['question'])
-        columns = pmock.call_args[0][3]
-        self.assertEqual(len(columns), 1)
-        self.assertEqual(columns[0], 'question')
+        qs = Poll.objects.all()
+        values = qs.values_list('question', flat=True)
+        assert len(values) == 2
+        assert "Question1" in values
+        assert "Question2" in values
 
         copy_insert(Poll, self.entries, columns=['pub_date'])
-        columns = pmock.call_args[0][3]
-        self.assertEqual(len(columns), 1)
-        self.assertEqual(columns[0], 'pub_date')
+        qs = Poll.objects.all()
+        values = qs.values_list('pub_date', flat=True)
+        self.assertEqual(len(values), 4)
+        assert isinstance(values[2], datetime)
+        assert isinstance(values[3], datetime)
 
         copy_insert(Poll, self.entries, columns=['question', 'pub_date'])
-        columns = pmock.call_args[0][3]
-        self.assertEqual(len(columns), 2)
-        self.assertEqual(columns[0], 'question')
-        self.assertEqual(columns[1], 'pub_date')
+        qs = Poll.objects.all()
+        values = qs.values_list('question', flat=True)
+        self.assertEqual(len(values), 6)
+        assert "Question1" == values[4]
+        assert "Question2" == values[5]
+
+    def test_copy_insert_raw(self):
+        copy_insert_raw(Poll._meta.db_table, [[self.entries[0]]], columns=['question'])
+        qs = Poll.objects.all()
+        values = qs.values_list('question', flat=True)
+        self.assertEqual(len(values), 1)
+        assert "Poll object" in values
 
 
-@patch('djangopg.copy._send_csv_to_postgres')
-class CsvTestCase(unittest.TestCase):
-    """Tests for the CSV formatting."""
-
-    def test_csv_generated_number_of_lines(self, pmock):
-        p = Poll(question='Q')
-        copy_insert(Poll, [p])
-        fd = StringIO(pmock.call_args[0][0])
-        lines = fd.readlines()
-        self.assertEqual(len(lines), 1)
-
-    def test_csv_generated_is_valid(self, pmock):
-        p = Poll(question='Q')
-        copy_insert(Poll, [p])
-        fd = StringIO(pmock.call_args[0][0])
-        csvf = csv.reader(fd)
-        rows = [row for row in csvf]
-        self.assertEqual(rows[0][0], 'Q')
-        self.assertEqual(rows[0][1], '')
-
-
-@patch('djangopg.copy._send_csv_to_postgres')
+@pytest.mark.django_db
 class ForeingKeyFieldTestCase(unittest.TestCase):
     """Tests for handling of foreign key fields."""
 
-    def test_actual_foreign_key_value_is_extracted_correctly(self, pmock):
+    def test_actual_foreign_key_value_is_extracted_correctly(self):
         p = Poll(pk=1)
         c = Choice(poll=p, choice_text='Text', votes=0)
         copy_insert(Choice, [c])
-        fd = pmock.call_args[0][0]
-        csvf = csv.reader(fd)
-        rows = [row for row in csvf]
-        data = rows[0]
-        self.assertEqual(int(data[0]), 1)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert values[0]['poll_id'] == 1
 
 
-@patch('djangopg.copy._send_csv_to_postgres')
+@pytest.mark.django_db
 class EmptyStringTestCase(unittest.TestCase):
     """Test handling of empty strings."""
 
@@ -130,38 +124,44 @@ class EmptyStringTestCase(unittest.TestCase):
         p = Poll(pk=1)
         self.c = Choice(poll=p)
 
-    def test_empty_string_start(self, pmock):
+    def test_empty_string_start(self):
         copy_insert(Choice, [self.c], columns=['choice_text', 'poll', 'votes'])
-        csv_file = pmock.call_args[0][0]
-        self.assertEqual('"",1,\n', csv_file)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert {'votes': None, 'choice_text': None, u'id': 6, u'poll_id': 1} == values[0]
 
-    def test_empty_string_end(self, pmock):
+    def test_empty_string_end(self):
         copy_insert(Choice, [self.c], columns=['poll', 'votes', 'choice_text'])
-        csv_file = pmock.call_args[0][0]
-        self.assertEqual('1,,""\n', csv_file)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert {'votes': None, 'choice_text': None, u'id': 2, u'poll_id': 1} == values[0]
 
-    def test_empty_string_middle(self, pmock):
+    def test_empty_string_middle(self):
         copy_insert(Choice, [self.c], columns=['poll', 'choice_text', 'votes'])
-        csv_file = pmock.call_args[0][0]
-        self.assertEqual('1,"",\n', csv_file)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert {'votes': None, 'choice_text': None, u'id': 5, u'poll_id': 1} == values[0]
 
-    def test_empty_string_start_newline(self, pmock):
+    def test_empty_string_start_newline(self):
         copy_insert(
             Choice, [self.c, self.c], columns=['choice_text', 'poll', 'votes']
         )
-        csv_file = pmock.call_args[0][0]
-        self.assertEqual('"",1,\n"",1,\n', csv_file)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert {'votes': None, 'choice_text': None, u'id': 7, u'poll_id': 1} == values[0]
 
-    def test_empty_string_end_newline(self, pmock):
+    def test_empty_string_end_newline(self):
         copy_insert(
             Choice, [self.c, self.c], columns=['poll', 'votes', 'choice_text']
         )
-        csv_file = pmock.call_args[0][0]
-        self.assertEqual('1,,""\n1,,""\n', csv_file)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert {'votes': None, 'choice_text': None, u'id': 3, u'poll_id': 1} == values[0]
 
-    def test_no_empty_string(self, pmock):
+    def test_no_empty_string(self):
         copy_insert(
             Choice, [self.c, self.c], columns=['poll', 'choice_text', 'votes']
         )
-        csv_file = pmock.call_args[0][0]
-        self.assertEqual('1,"",\n1,"",\n', csv_file)
+        qs = Choice.objects.all()
+        values = qs.values()
+        assert {'votes': None, 'choice_text': None, u'id': 9, u'poll_id': 1} == values[0]

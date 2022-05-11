@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-from djangopg.fields import ArrayField, TextArrayField, IntArrayField
+
+import six
+
+from djangopg.fields import (
+    ArrayField, TextArrayField, IntArrayField, CaseInsensitiveMixin
+)
 
 
 class DbTypeTestCase(unittest.TestCase):
@@ -48,6 +53,10 @@ class PythonValueTestCase(unittest.TestCase):
     def test_list_returns_list(self):
         self.assertEqual(self.f.to_python([1, 2]), [1, 2])
 
+    def test_wrong_type(self):
+        with self.assertRaises(TypeError):
+            self.f.to_python({})
+
 
 class ConversionToPythonTestCase(unittest.TestCase):
     """Test specific conversion to django types."""
@@ -57,7 +66,7 @@ class ConversionToPythonTestCase(unittest.TestCase):
         res = f.to_python(['a', 'b'])
         self.assertIsInstance(res, list)
         for element in res:
-            self.assertIsInstance(element, unicode)
+            self.assertIsInstance(element, six.text_type)
 
     def test_populated_array_of_int_returns_list_of_int(self):
         f = IntArrayField()
@@ -65,6 +74,11 @@ class ConversionToPythonTestCase(unittest.TestCase):
         self.assertIsInstance(res, list)
         for element in res:
             self.assertIsInstance(element, int)
+
+    def test_none_returns_none(self):
+        f = TextArrayField()
+        self.assertIsNone(f.to_python(None))
+        self.assertIsNone(f.to_python(''))
 
 
 class DbValueTestCase(unittest.TestCase):
@@ -84,3 +98,27 @@ class DbValueTestCase(unittest.TestCase):
     def test_list_returns_list(self):
         value = [1, 2, 3, ]
         self.assertEqual(self.f.get_prep_value(value), value)
+
+
+class CaseInsensitiveMixinTest(unittest.TestCase):
+    def setUp(self):
+        self.mixin = CaseInsensitiveMixin()
+
+    def test_db_type(self):
+        self.assertEqual(self.mixin.db_type(''), 'citext')
+
+    def test_str_returns_str(self):
+        self.assertEqual(self.mixin.to_python('some_str'), 'some_str')
+
+    def test_unicode_returns_str(self):
+        self.assertEqual(self.mixin.to_python(u'some_str'), u'some_str')
+
+    def test_none_returns_none(self):
+        self.assertIsNone(self.mixin.to_python(None))
+
+    def test_any_type_returns_string(self):
+        self.assertEqual(self.mixin.to_python({1: '1'}), "{1: '1'}")
+        if six.PY2:
+            self.assertEqual(self.mixin.to_python({'1'}), u"set(['1'])")
+        else:
+            self.assertEqual(self.mixin.to_python({'1'}), "{'1'}")

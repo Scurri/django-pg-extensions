@@ -2,8 +2,15 @@
 
 import re
 import csv
-from cStringIO import StringIO
 from contextlib import closing
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
+
+import six
+
 from django.db import connections
 from django.db.models import AutoField
 
@@ -17,8 +24,12 @@ def _convert_to_csv_form(data):
     if data == '':
         return '""'
     # CSV needs to be encoded to UTF8
-    if isinstance(data, unicode):
+    if isinstance(data, six.text_type) and six.PY2:
         return data.encode('UTF-8')
+    if isinstance(data, list):
+        import json
+        data = json.dumps(data)
+        data = '{' + data[1:-1] + '}'
     return data
 
 
@@ -45,7 +56,7 @@ def _send_csv_to_postgres(csv_text, conn, table_name, columns):
     fd = StringIO(csv_text)
     # Move the fp to the beginning of the string
     fd.seek(0)
-    columns = map(conn.ops.quote_name, columns)
+    columns = list(map(conn.ops.quote_name, columns))
     cursor = conn.cursor()
     sql = "COPY %s(%s) FROM STDIN WITH CSV"
     try:
@@ -74,7 +85,6 @@ def copy_insert(model, entries, columns=None, using='default', **kwargs):
         fields = [
             f for f in model._meta.fields if not isinstance(f, AutoField)
         ]
-        columns = [f.column for f in fields]
     else:
         fields = [model._meta.get_field_by_name(col)[0] for col in columns]
 

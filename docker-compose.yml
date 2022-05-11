@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  djangopg_db:
+    build:
+      dockerfile: psql-Dockerfile
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: dbpass
+    container_name: pg-ext-db
+  tox:
+    build:
+      dockerfile: tox-Dockerfile
+    environment:
+      POSTGRES_URL: postgresql://dbuser:dbpass@djangopg_db:5432/test_db
+    command: bash -c 'python manage.py migrate && tox -q -e py27'
+    container_name: tox-pg-ext
+    depends_on:
+      - djangopg_db

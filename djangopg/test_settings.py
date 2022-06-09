@@ -6,12 +6,8 @@ TEST_DISCOVER_TOP_LEVEL = os.path.dirname(os.path.dirname(__file__))
 TEST_DISCOVER_ROOT = os.path.join(TEST_DISCOVER_TOP_LEVEL, 'tests')
 
 DATABASES = {
-    'memory': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
-    },
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'djangopg.postgresql_psycopg2',
         'NAME': 'test_db',
         'USER': 'dbuser',
         'PASSWORD': 'dbpass',

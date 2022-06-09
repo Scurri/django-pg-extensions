@@ -1,5 +1,8 @@
 import psycopg2
 import pytest
+from djangopg.copy import copy_insert
+
+from test_app.models import TestModel
 
 
 @pytest.fixture(scope='session')
@@ -33,9 +36,6 @@ def test_connection():
 
 
 @pytest.mark.django_db
-def test_copy():
-    from djangopg.copy import copy_insert
-    from tests.data import TestModel
-    tm = TestModel(txt_array=['txt', 'text'],
-                   int_array=[11, 21], case_char='char', case_slug='slug')
-    copy_insert(TestModel, [tm], using='default')
+def test_empty_copy():
+    tm = TestModel(txt_array=[], int_array=[], case_char='', case_slug='')
+    copy_insert(TestModel, [tm])

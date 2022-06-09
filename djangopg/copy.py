@@ -26,6 +26,10 @@ def _convert_to_csv_form(data):
     # CSV needs to be encoded to UTF8
     if isinstance(data, six.text_type) and six.PY2:
         return data.encode('UTF-8')
+    if isinstance(data, list):
+        import json
+        data = json.dumps(data)
+        data = '{' + data[1:-1] + '}'
     return data
 
 
@@ -81,7 +85,6 @@ def copy_insert(model, entries, columns=None, using='default', **kwargs):
         fields = [
             f for f in model._meta.fields if not isinstance(f, AutoField)
         ]
-        columns = [f.column for f in fields]
     else:
         fields = [model._meta.get_field_by_name(col)[0] for col in columns]
 

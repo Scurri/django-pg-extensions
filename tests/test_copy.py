@@ -29,7 +29,7 @@ from tests.data import Poll, Choice
 #
 #         table_name = Poll._meta.db_table
 #         _send_csv_to_postgres(
-#             '1,2', connections['memory'], table_name, ['1', '2']
+#             '1,2', connections['default'], table_name, ['1', '2']
 #         )
 #         sql = p_cursor_mock.return_value.copy_expert.call_args[0][0]
 #         self.assertEqual(
@@ -91,29 +91,29 @@ class ColumnsTestCase(unittest.TestCase):
         ]
 
     def test_all_non_pk_columns_are_used_if_none_specified(self, pmock):
-        copy_insert(Poll, self.entries, using='memory')
+        copy_insert(Poll, self.entries)
         columns = pmock.call_args[0][3]
         self.assertEqual(len(columns), 2)
 
     def test_specified_columns_only_are_used(self, pmock):
-        copy_insert(Poll, self.entries, columns=['question'], using='memory')
+        copy_insert(Poll, self.entries, columns=['question'])
         columns = pmock.call_args[0][3]
         self.assertEqual(len(columns), 1)
         self.assertEqual(columns[0], 'question')
 
-        copy_insert(Poll, self.entries, columns=['pub_date'], using='memory')
+        copy_insert(Poll, self.entries, columns=['pub_date'])
         columns = pmock.call_args[0][3]
         self.assertEqual(len(columns), 1)
         self.assertEqual(columns[0], 'pub_date')
 
-        copy_insert(Poll, self.entries, columns=['question', 'pub_date'], using='memory')
+        copy_insert(Poll, self.entries, columns=['question', 'pub_date'])
         columns = pmock.call_args[0][3]
         self.assertEqual(len(columns), 2)
         self.assertEqual(columns[0], 'question')
         self.assertEqual(columns[1], 'pub_date')
 
     def test_copy_insert_raw(self, pmock):
-        copy_insert_raw(Poll, [[self.entries[0]]], columns=['question'], using='memory')
+        copy_insert_raw(Poll, [[self.entries[0]]], columns=['question'])
         columns = pmock.call_args[0][3]
         content = pmock.call_args[0][0]
         self.assertEqual(content, 'Poll object\n')
@@ -126,14 +126,14 @@ class CsvTestCase(unittest.TestCase):
 
     def test_csv_generated_number_of_lines(self, pmock):
         p = Poll(question='Q')
-        copy_insert(Poll, [p], using='memory')
+        copy_insert(Poll, [p])
         fd = StringIO(pmock.call_args[0][0])
         lines = fd.readlines()
         self.assertEqual(len(lines), 1)
 
     def test_csv_generated_is_valid(self, pmock):
         p = Poll(question='Q')
-        copy_insert(Poll, [p], using='memory')
+        copy_insert(Poll, [p])
         fd = StringIO(pmock.call_args[0][0])
         csvf = csv.reader(fd)
         rows = [row for row in csvf]
@@ -148,7 +148,7 @@ class ForeingKeyFieldTestCase(unittest.TestCase):
     def test_actual_foreign_key_value_is_extracted_correctly(self, pmock):
         p = Poll(pk=1)
         c = Choice(poll=p, choice_text='Text', votes=0)
-        copy_insert(Choice, [c], using='memory')
+        copy_insert(Choice, [c])
         fd = pmock.call_args[0][0]
         csvf = csv.reader(fd)
         rows = [row for row in csvf]
@@ -165,37 +165,37 @@ class EmptyStringTestCase(unittest.TestCase):
         self.c = Choice(poll=p)
 
     def test_empty_string_start(self, pmock):
-        copy_insert(Choice, [self.c], columns=['choice_text', 'poll', 'votes'], using='memory')
+        copy_insert(Choice, [self.c], columns=['choice_text', 'poll', 'votes'])
         csv_file = pmock.call_args[0][0]
         self.assertEqual('"",1,\n', csv_file)
 
     def test_empty_string_end(self, pmock):
-        copy_insert(Choice, [self.c], columns=['poll', 'votes', 'choice_text'], using='memory')
+        copy_insert(Choice, [self.c], columns=['poll', 'votes', 'choice_text'])
         csv_file = pmock.call_args[0][0]
         self.assertEqual('1,,""\n', csv_file)
 
     def test_empty_string_middle(self, pmock):
-        copy_insert(Choice, [self.c], columns=['poll', 'choice_text', 'votes'], using='memory')
+        copy_insert(Choice, [self.c], columns=['poll', 'choice_text', 'votes'])
         csv_file = pmock.call_args[0][0]
         self.assertEqual('1,"",\n', csv_file)
 
     def test_empty_string_start_newline(self, pmock):
         copy_insert(
-            Choice, [self.c, self.c], columns=['choice_text', 'poll', 'votes'], using='memory'
+            Choice, [self.c, self.c], columns=['choice_text', 'poll', 'votes']
         )
         csv_file = pmock.call_args[0][0]
         self.assertEqual('"",1,\n"",1,\n', csv_file)
 
     def test_empty_string_end_newline(self, pmock):
         copy_insert(
-            Choice, [self.c, self.c], columns=['poll', 'votes', 'choice_text'], using='memory'
+            Choice, [self.c, self.c], columns=['poll', 'votes', 'choice_text']
         )
         csv_file = pmock.call_args[0][0]
         self.assertEqual('1,,""\n1,,""\n', csv_file)
 
     def test_no_empty_string(self, pmock):
         copy_insert(
-            Choice, [self.c, self.c], columns=['poll', 'choice_text', 'votes'], using='memory'
+            Choice, [self.c, self.c], columns=['poll', 'choice_text', 'votes']
         )
         csv_file = pmock.call_args[0][0]
         self.assertEqual('1,"",\n1,"",\n', csv_file)

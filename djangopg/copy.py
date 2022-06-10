@@ -4,6 +4,7 @@ import re
 import csv
 from cStringIO import StringIO
 from contextlib import closing
+
 from django.db import connections
 from django.db.models import AutoField
 
@@ -19,6 +20,7 @@ def _convert_to_csv_form(data):
     # CSV needs to be encoded to UTF8
     if isinstance(data, unicode):
         return data.encode('UTF-8')
+    # Arrays are not supported
     return data
 
 
@@ -74,7 +76,6 @@ def copy_insert(model, entries, columns=None, using='default', **kwargs):
         fields = [
             f for f in model._meta.fields if not isinstance(f, AutoField)
         ]
-        columns = [f.column for f in fields]
     else:
         fields = [model._meta.get_field_by_name(col)[0] for col in columns]
 

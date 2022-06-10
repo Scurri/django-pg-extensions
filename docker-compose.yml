@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  db:
+    build:
+      dockerfile: docker/database/Dockerfile
+      context: .
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: dbpass
+    container_name: djangopg_db
+  tox:
+    build:
+      dockerfile: docker/tox/Dockerfile
+      context: .
+    environment:
+      POSTGRES_URL: postgresql://dbuser:dbpass@djangopg_db:5432/test_db
+    command: bash -c "while ! nc -w 1 -z djangopg_db 5432; do sleep 0.1; done; cd /home/root/; python manage.py migrate && tox -q"
+    container_name: djangopg_tox
+    volumes:
+      - .:/home/root/
+    depends_on:
+      - db

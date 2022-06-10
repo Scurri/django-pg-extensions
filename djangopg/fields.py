@@ -24,7 +24,7 @@ class ArrayField(models.Field):
             # is called on empty constructors.
             return None
         if not isinstance(value, list):
-            raise TypeError("Expected list, got %s" % type(value))
+            raise TypeError("Expected list, got {}".format(type(value)))
         return value
 
     def get_prep_value(self, value):
@@ -32,18 +32,8 @@ class ArrayField(models.Field):
 
     def get_prep_lookup(self, lookup_type, value):
         if lookup_type not in self._allowed_operators:
-            raise TypeError('Invalid operator %s' % lookup_type)
+            raise TypeError('Invalid operator {}'.format(lookup_type))
         return value
-
-    def get_db_prep_lookup(self, lookup_type, value, connection, prepared=False):
-        prep_value = super(ArrayField, self).get_db_prep_lookup(
-            lookup_type, value, connection, prepared
-        )
-        if prep_value is None and lookup_type.startswith('array_'):
-            prep_value = self.get_db_prep_value(
-                value, connection=connection, prepared=prepared
-            )
-            return [prep_value]
 
 
 class TextArrayField(ArrayField):
@@ -90,3 +80,36 @@ class CaseInsensitiveSlugField(CaseInsensitiveMixin, models.SlugField):
     """Case-insensitive SlugField."""
 
     __metaclass__ = models.SubfieldBase
+
+
+@ArrayField.register_lookup
+class ArrayContainsLookup(models.Lookup):
+    lookup_name = 'array_contains'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = lhs_params + rhs_params
+        return '%s @> %s' % (lhs, rhs), params
+
+
+@ArrayField.register_lookup
+class ArrayContainedLookup(models.Lookup):
+    lookup_name = 'array_contained'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = lhs_params + rhs_params
+        return '%s <@ %s' % (rhs, lhs), params
+
+
+@ArrayField.register_lookup
+class OverlapsLookup(models.Lookup):
+    lookup_name = 'array_overlaps'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = lhs_params + rhs_params
+        return '%s && %s' % (lhs, rhs), params

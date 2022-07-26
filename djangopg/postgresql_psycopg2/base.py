@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from django.db.backends.postgresql_psycopg2.base import DatabaseWrapper
+from django.db.backends.postgresql_psycopg2.base import (
+    DatabaseWrapper as BaseDatabaseWrapper
+)
 from django.db.backends.postgresql_psycopg2.operations import (
     DatabaseOperations as BaseOperations
 )
@@ -16,7 +18,7 @@ class DatabaseOperations(BaseOperations):
         return lookup
 
 
-class DatabaseWrapper(DatabaseWrapper):
+class DatabaseWrapper(BaseDatabaseWrapper):
     """Custom database wrapper."""
 
     def __init__(self, *args, **kwargs):

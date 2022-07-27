@@ -2,7 +2,7 @@
 This package tries to expose functionality from PostgreSQL to django
 applications.
 
-Python 2.7 is required.
+Python 2.7 or 3.4+ is required.
 
 ## Features
 - Support for the COPY command.

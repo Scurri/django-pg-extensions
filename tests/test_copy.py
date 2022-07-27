@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime
 
 import pytest
+import six
 
 from djangopg.copy import (
     _convert_to_csv_form, copy_insert, copy_insert_raw
@@ -40,7 +41,10 @@ class DataConversionTestCase(unittest.TestCase):
     def test_encoding_for_unicode_is_utf8_(self):
         data = u'Δοκιμή'
         res = _convert_to_csv_form(data)
-        expected = data.encode('UTF-8')
+        if six.PY2:
+            expected = data.encode('UTF-8')
+        else:
+            expected = data
         self.assertEqual(res, expected)
 
     def test_str_is_returned_attached(self):

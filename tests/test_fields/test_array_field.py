@@ -2,6 +2,8 @@
 
 import unittest
 
+import six
+
 from djangopg.fields import (
     ArrayField, TextArrayField, IntArrayField, CaseInsensitiveMixin
 )
@@ -64,7 +66,7 @@ class ConversionToPythonTestCase(unittest.TestCase):
         res = f.to_python(['a', 'b'])
         self.assertIsInstance(res, list)
         for element in res:
-            self.assertIsInstance(element, unicode)
+            self.assertIsInstance(element, six.text_type)
 
     def test_populated_array_of_int_returns_list_of_int(self):
         f = IntArrayField()
@@ -116,4 +118,8 @@ class CaseInsensitiveMixinTest(unittest.TestCase):
 
     def test_any_type_returns_string(self):
         self.assertEqual(self.mixin.to_python({1: '1'}), "{1: '1'}")
-        self.assertEqual(self.mixin.to_python({'1'}), u"set(['1'])")
+        if six.PY2:
+            expected = u"set(['1'])"
+        else:
+            expected = u"{'1'}"
+        self.assertEqual(self.mixin.to_python({'1'}), expected)

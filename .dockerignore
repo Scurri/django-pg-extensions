@@ -1,0 +1,3 @@
+.tox
+tests/__pycache__
+tests/test_fields/__pycache__

@@ -16,7 +16,13 @@ Python 2.7 or 3.4+ is required.
 ```
 pip download --no-cache-dir -r requirements/tests.txt --dest pip-cache
 ```
-Note: `coverage`, `filelock`, `psycopg2`, `scandir` and `tox` you need `tar.gz` instead of `whl` version.
+Notes:
+
+- `coverage`, `filelock`, `psycopg2`, `scandir` and `tox` you need `tar.gz` instead of `whl` version.
+- If you get an error downloading any library, e.g. `platformdirs`, you can:
+    - try to run `python -m pip download --no-cache-dir -r requirements/tests.txt --dest pip-cache`
+    - or comment it from the requirements file, download it directly from pipy.org and place it in
+      the `pip-cache` folder.
 
 2. Build container:
 ```
@@ -27,4 +33,9 @@ docker-compose build
 Run test against real PostgreSQL instance, using Docker:
 ```
 docker-compose run --rm tox
+```
+
+### Building the wheel
+```
+python setup.py bdist_wheel
 ```

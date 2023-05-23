@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
+import django
 import pytest
 
 from .resource_app.models import TestModel
+
+
+def test_django_version():
+    assert django.VERSION == (1, 9, 13, 'final', 0)
 
 
 @pytest.mark.django_db
